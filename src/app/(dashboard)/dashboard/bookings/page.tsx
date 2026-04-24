@@ -6,13 +6,25 @@ import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Select from '@/components/ui/Select';
 import Loading from '@/components/ui/Loading';
+import DataTable, { Column } from '@/components/ui/DataTable';
+import BulkActionBar from '@/components/ui/BulkActionBar';
+import { useSelection } from '@/hooks/useSelection';
+import { useToast } from '@/hooks/useToast';
+import { useConfirm } from '@/components/providers/ConfirmProvider';
+import { exportCsv } from '@/lib/exportCsv';
+import { exportPdf } from '@/lib/exportPdf';
 import { format } from 'date-fns';
-import { Calendar, User, Phone, Mail, Clock } from 'lucide-react';
+import BookingDetailModal from '@/components/dashboard/BookingDetailModal';
+import { Calendar, Download } from 'lucide-react';
 
 export default function BookingsPage() {
   const [bookings, setBookings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');
+  const { addToast } = useToast();
+  const confirm = useConfirm();
+  const selection = useSelection(bookings);
+  const [selectedBooking, setSelectedBooking] = useState<any>(null);
 
   useEffect(() => {
     fetchBookings();
@@ -44,10 +56,53 @@ export default function BookingsPage() {
       });
 
       if (res.ok) {
+        addToast({ type: 'success', message: `Booking ${status.toLowerCase()}` });
         fetchBookings();
       }
     } catch (error) {
-      console.error('Error updating booking:', error);
+      addToast({ type: 'error', message: 'Failed to update booking' });
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    const ok = await confirm({
+      title: 'Delete Bookings',
+      message: `Are you sure you want to delete ${selection.selectedCount} booking(s)?`,
+      variant: 'danger',
+      confirmLabel: 'Delete',
+    });
+    if (!ok) return;
+
+    try {
+      const res = await fetch('/api/bookings/bulk', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selection.selectedIds) }),
+      });
+      if (res.ok) {
+        addToast({ type: 'success', message: 'Bookings deleted' });
+        selection.clearSelection();
+        fetchBookings();
+      }
+    } catch {
+      addToast({ type: 'error', message: 'Failed to delete bookings' });
+    }
+  };
+
+  const handleBulkStatusUpdate = async (status: string) => {
+    try {
+      const res = await fetch('/api/bookings/bulk', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selection.selectedIds), data: { status } }),
+      });
+      if (res.ok) {
+        addToast({ type: 'success', message: `Bookings marked as ${status.toLowerCase()}` });
+        selection.clearSelection();
+        fetchBookings();
+      }
+    } catch {
+      addToast({ type: 'error', message: 'Failed to update bookings' });
     }
   };
 
@@ -61,6 +116,81 @@ export default function BookingsPage() {
     return <Badge variant={variants[status] || 'default'}>{status}</Badge>;
   };
 
+  const exportColumns = [
+    { key: 'service', header: 'Service' },
+    { key: 'customer', header: 'Customer' },
+    { key: 'date', header: 'Date' },
+    { key: 'time', header: 'Time' },
+    { key: 'status', header: 'Status' },
+    { key: 'price', header: 'Price' },
+  ];
+
+  const getExportData = () =>
+    bookings.map((b) => ({
+      service: b.service?.name || 'General',
+      customer: b.user.name,
+      date: format(new Date(b.date), 'MMM d, yyyy'),
+      time: b.startTime,
+      status: b.status,
+      price: b.totalPrice ? `$${b.totalPrice}` : '-',
+    }));
+
+  const columns: Column<any>[] = [
+    {
+      key: 'service',
+      header: 'Service',
+      render: (b) => (
+        <span className="font-medium">{b.service?.name || 'General Appointment'}</span>
+      ),
+    },
+    {
+      key: 'user',
+      header: 'Customer',
+      render: (b) => b.user.name,
+    },
+    {
+      key: 'date',
+      header: 'Date & Time',
+      render: (b) => (
+        <span>{format(new Date(b.date), 'MMM d, yyyy')} at {b.startTime}</span>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (b) => getStatusBadge(b.status),
+    },
+    {
+      key: 'totalPrice',
+      header: 'Price',
+      render: (b) => b.totalPrice ? <span className="font-semibold text-blue-600">${b.totalPrice}</span> : '-',
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      sortable: false,
+      render: (b) => (
+        <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+          {b.status === 'PENDING' && (
+            <>
+              <Button size="sm" onClick={() => updateBookingStatus(b.id, 'CONFIRMED')}>
+                Confirm
+              </Button>
+              <Button size="sm" variant="danger" onClick={() => updateBookingStatus(b.id, 'CANCELLED')}>
+                Decline
+              </Button>
+            </>
+          )}
+          {b.status === 'CONFIRMED' && (
+            <Button size="sm" onClick={() => updateBookingStatus(b.id, 'COMPLETED')}>
+              Complete
+            </Button>
+          )}
+        </div>
+      ),
+    },
+  ];
+
   if (loading) {
     return <Loading text="Loading bookings..." />;
   }
@@ -72,103 +202,49 @@ export default function BookingsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Bookings</h1>
           <p className="text-gray-600">Manage your appointments and bookings</p>
         </div>
-        <Select
-          options={[
-            { value: 'PENDING', label: 'Pending' },
-            { value: 'CONFIRMED', label: 'Confirmed' },
-            { value: 'COMPLETED', label: 'Completed' },
-            { value: 'CANCELLED', label: 'Cancelled' },
-          ]}
-          value={filter}
-          onChange={setFilter}
-          placeholder="All Bookings"
-        />
+        <div className="flex items-center gap-3">
+          <div className="flex gap-1">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => exportCsv(getExportData(), exportColumns, 'bookings')}
+            >
+              <Download className="w-4 h-4 mr-1" /> CSV
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => exportPdf(getExportData(), exportColumns, 'bookings', 'Bookings Report')}
+            >
+              <Download className="w-4 h-4 mr-1" /> PDF
+            </Button>
+          </div>
+          <Select
+            options={[
+              { value: 'PENDING', label: 'Pending' },
+              { value: 'CONFIRMED', label: 'Confirmed' },
+              { value: 'COMPLETED', label: 'Completed' },
+              { value: 'CANCELLED', label: 'Cancelled' },
+            ]}
+            value={filter}
+            onChange={setFilter}
+            placeholder="All Bookings"
+          />
+        </div>
       </div>
 
       {bookings.length > 0 ? (
-        <div className="space-y-4">
-          {bookings.map((booking) => (
-            <Card key={booking.id}>
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h3 className="font-semibold text-lg">
-                      {booking.service?.name || 'General Appointment'}
-                    </h3>
-                    {getStatusBadge(booking.status)}
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-gray-600">
-                    <div className="flex items-center gap-2">
-                      <Calendar className="w-4 h-4" />
-                      <span>
-                        {format(new Date(booking.date), 'MMM d, yyyy')} at {booking.startTime}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <User className="w-4 h-4" />
-                      <span>{booking.user.name}</span>
-                    </div>
-                    {booking.user.phone && (
-                      <div className="flex items-center gap-2">
-                        <Phone className="w-4 h-4" />
-                        <a href={`tel:${booking.user.phone}`} className="hover:text-blue-600">
-                          {booking.user.phone}
-                        </a>
-                      </div>
-                    )}
-                    <div className="flex items-center gap-2">
-                      <Mail className="w-4 h-4" />
-                      <a href={`mailto:${booking.user.email}`} className="hover:text-blue-600">
-                        {booking.user.email}
-                      </a>
-                    </div>
-                  </div>
-
-                  {booking.notes && (
-                    <p className="mt-2 text-sm text-gray-500">
-                      <strong>Notes:</strong> {booking.notes}
-                    </p>
-                  )}
-
-                  {booking.totalPrice && (
-                    <p className="mt-2 text-lg font-semibold text-blue-600">
-                      ${booking.totalPrice}
-                    </p>
-                  )}
-                </div>
-
-                <div className="flex gap-2">
-                  {booking.status === 'PENDING' && (
-                    <>
-                      <Button
-                        size="sm"
-                        onClick={() => updateBookingStatus(booking.id, 'CONFIRMED')}
-                      >
-                        Confirm
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        onClick={() => updateBookingStatus(booking.id, 'CANCELLED')}
-                      >
-                        Decline
-                      </Button>
-                    </>
-                  )}
-                  {booking.status === 'CONFIRMED' && (
-                    <Button
-                      size="sm"
-                      onClick={() => updateBookingStatus(booking.id, 'COMPLETED')}
-                    >
-                      Mark Complete
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </Card>
-          ))}
-        </div>
+        <DataTable
+          data={bookings}
+          columns={columns}
+          selectable
+          selectedIds={selection.selectedIds}
+          onToggleSelect={selection.toggle}
+          onToggleSelectAll={selection.toggleAll}
+          allSelected={selection.allSelected}
+          someSelected={selection.someSelected}
+          onRowClick={setSelectedBooking}
+        />
       ) : (
         <Card>
           <div className="text-center py-8">
@@ -177,6 +253,22 @@ export default function BookingsPage() {
           </div>
         </Card>
       )}
+
+      <BulkActionBar
+        selectedCount={selection.selectedCount}
+        onClear={selection.clearSelection}
+        actions={[
+          { label: 'Confirm All', onClick: () => handleBulkStatusUpdate('CONFIRMED') },
+          { label: 'Delete', onClick: handleBulkDelete, variant: 'danger' },
+        ]}
+      />
+
+      <BookingDetailModal
+        booking={selectedBooking}
+        isOpen={!!selectedBooking}
+        onClose={() => setSelectedBooking(null)}
+        onUpdate={fetchBookings}
+      />
     </div>
   );
 }

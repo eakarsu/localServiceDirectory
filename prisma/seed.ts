@@ -8,6 +8,8 @@ async function main() {
 
   // Clear existing data
   console.log('Clearing existing data...');
+  await prisma.passwordResetToken.deleteMany();
+  await prisma.emailVerificationToken.deleteMany();
   await prisma.businessAnalytics.deleteMany();
   await prisma.notification.deleteMany();
   await prisma.message.deleteMany();
@@ -753,6 +755,63 @@ async function main() {
     }
   }
 
+  // ============================================
+  // PASSWORD RESET TOKENS (15+ tokens)
+  // ============================================
+  console.log('Creating password reset tokens...');
+
+  const allUsers = [...consumers, ...businessOwners];
+  for (let i = 0; i < 16; i++) {
+    const user = allUsers[i % allUsers.length];
+    const daysAgo = i * 2;
+    const isExpired = i >= 8;
+    const isUsed = i >= 4 && i < 8;
+
+    await prisma.passwordResetToken.create({
+      data: {
+        token: `prt-${crypto.randomUUID()}`,
+        userId: user.id,
+        expiresAt: isExpired
+          ? new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000)
+          : new Date(Date.now() + (24 - daysAgo) * 60 * 60 * 1000),
+        used: isUsed,
+        createdAt: new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000),
+      },
+    });
+  }
+
+  // ============================================
+  // EMAIL VERIFICATION TOKENS (15+ tokens)
+  // ============================================
+  console.log('Creating email verification tokens...');
+
+  for (let i = 0; i < 16; i++) {
+    const user = allUsers[i % allUsers.length];
+    const daysAgo = i;
+    const isExpired = i >= 10;
+    const isUsed = i >= 5 && i < 10;
+
+    await prisma.emailVerificationToken.create({
+      data: {
+        token: `evt-${crypto.randomUUID()}`,
+        userId: user.id,
+        expiresAt: isExpired
+          ? new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000)
+          : new Date(Date.now() + (48 - daysAgo) * 60 * 60 * 1000),
+        used: isUsed,
+        createdAt: new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000),
+      },
+    });
+
+    // Mark some users as email-verified
+    if (isUsed) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { emailVerified: new Date(Date.now() - daysAgo * 24 * 60 * 60 * 1000) },
+      });
+    }
+  }
+
   console.log('Database seeded successfully with comprehensive data!');
   console.log(`
 Summary:
@@ -768,6 +827,8 @@ Summary:
 - Notifications: 20
 - Messages: 20
 - Analytics: ${30 * businesses.length} records
+- Password Reset Tokens: 16
+- Email Verification Tokens: 16
   `);
 }
 

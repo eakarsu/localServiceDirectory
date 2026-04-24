@@ -6,13 +6,25 @@ import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import Select from '@/components/ui/Select';
 import Loading from '@/components/ui/Loading';
+import DataTable, { Column } from '@/components/ui/DataTable';
+import BulkActionBar from '@/components/ui/BulkActionBar';
+import { useSelection } from '@/hooks/useSelection';
+import { useToast } from '@/hooks/useToast';
+import { useConfirm } from '@/components/providers/ConfirmProvider';
+import { exportCsv } from '@/lib/exportCsv';
+import { exportPdf } from '@/lib/exportPdf';
 import { format } from 'date-fns';
-import { Users, Mail, Phone, TrendingUp } from 'lucide-react';
+import LeadDetailModal from '@/components/dashboard/LeadDetailModal';
+import { Users, TrendingUp, Download } from 'lucide-react';
 
 export default function LeadsPage() {
   const [leads, setLeads] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('');
+  const { addToast } = useToast();
+  const confirm = useConfirm();
+  const selection = useSelection(leads);
+  const [selectedLead, setSelectedLead] = useState<any>(null);
 
   useEffect(() => {
     fetchLeads();
@@ -44,10 +56,53 @@ export default function LeadsPage() {
       });
 
       if (res.ok) {
+        addToast({ type: 'success', message: `Lead marked as ${status.toLowerCase()}` });
         fetchLeads();
       }
     } catch (error) {
-      console.error('Error updating lead:', error);
+      addToast({ type: 'error', message: 'Failed to update lead' });
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    const ok = await confirm({
+      title: 'Delete Leads',
+      message: `Are you sure you want to delete ${selection.selectedCount} lead(s)?`,
+      variant: 'danger',
+      confirmLabel: 'Delete',
+    });
+    if (!ok) return;
+
+    try {
+      const res = await fetch('/api/leads/bulk', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selection.selectedIds) }),
+      });
+      if (res.ok) {
+        addToast({ type: 'success', message: 'Leads deleted' });
+        selection.clearSelection();
+        fetchLeads();
+      }
+    } catch {
+      addToast({ type: 'error', message: 'Failed to delete leads' });
+    }
+  };
+
+  const handleBulkStatusUpdate = async (status: string) => {
+    try {
+      const res = await fetch('/api/leads/bulk', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids: Array.from(selection.selectedIds), data: { status } }),
+      });
+      if (res.ok) {
+        addToast({ type: 'success', message: `Leads marked as ${status.toLowerCase()}` });
+        selection.clearSelection();
+        fetchLeads();
+      }
+    } catch {
+      addToast({ type: 'error', message: 'Failed to update leads' });
     }
   };
 
@@ -69,6 +124,102 @@ export default function LeadsPage() {
     return 'text-red-600';
   };
 
+  const exportColumns = [
+    { key: 'name', header: 'Name' },
+    { key: 'email', header: 'Email' },
+    { key: 'phone', header: 'Phone' },
+    { key: 'status', header: 'Status' },
+    { key: 'source', header: 'Source' },
+    { key: 'score', header: 'Quality Score' },
+    { key: 'date', header: 'Date' },
+  ];
+
+  const getExportData = () =>
+    leads.map((l) => ({
+      name: l.name,
+      email: l.email,
+      phone: l.phone || '-',
+      status: l.status,
+      source: l.source || 'Unknown',
+      score: l.aiScore ? `${Math.round(l.aiScore * 100)}%` : '-',
+      date: format(new Date(l.createdAt), 'MMM d, yyyy'),
+    }));
+
+  const columns: Column<any>[] = [
+    {
+      key: 'name',
+      header: 'Name',
+      render: (l) => <span className="font-medium">{l.name}</span>,
+    },
+    {
+      key: 'email',
+      header: 'Contact',
+      render: (l) => (
+        <div className="text-sm">
+          <div>{l.email}</div>
+          {l.phone && <div className="text-gray-400">{l.phone}</div>}
+        </div>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (l) => getStatusBadge(l.status),
+    },
+    {
+      key: 'aiScore',
+      header: 'Quality',
+      render: (l) =>
+        l.aiScore ? (
+          <div className={`flex items-center gap-1 ${getScoreColor(l.aiScore)}`}>
+            <TrendingUp className="w-4 h-4" />
+            <span className="text-sm font-medium">{Math.round(l.aiScore * 100)}%</span>
+          </div>
+        ) : (
+          <span className="text-gray-400">-</span>
+        ),
+    },
+    {
+      key: 'source',
+      header: 'Source',
+      render: (l) => <span className="text-gray-500 capitalize">{l.source || 'Unknown'}</span>,
+    },
+    {
+      key: 'createdAt',
+      header: 'Date',
+      render: (l) => format(new Date(l.createdAt), 'MMM d, yyyy'),
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      sortable: false,
+      render: (l) => (
+        <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+          {l.status === 'NEW' && (
+            <Button size="sm" onClick={() => updateLeadStatus(l.id, 'CONTACTED')}>
+              Contact
+            </Button>
+          )}
+          {l.status === 'CONTACTED' && (
+            <>
+              <Button size="sm" onClick={() => updateLeadStatus(l.id, 'QUALIFIED')}>
+                Qualify
+              </Button>
+              <Button size="sm" variant="danger" onClick={() => updateLeadStatus(l.id, 'LOST')}>
+                Lost
+              </Button>
+            </>
+          )}
+          {l.status === 'QUALIFIED' && (
+            <Button size="sm" variant="outline" onClick={() => updateLeadStatus(l.id, 'CONVERTED')}>
+              Convert
+            </Button>
+          )}
+        </div>
+      ),
+    },
+  ];
+
   if (loading) {
     return <Loading text="Loading leads..." />;
   }
@@ -80,109 +231,50 @@ export default function LeadsPage() {
           <h1 className="text-2xl font-bold text-gray-900">Leads</h1>
           <p className="text-gray-600">Manage and track potential customers</p>
         </div>
-        <Select
-          options={[
-            { value: 'NEW', label: 'New' },
-            { value: 'CONTACTED', label: 'Contacted' },
-            { value: 'QUALIFIED', label: 'Qualified' },
-            { value: 'CONVERTED', label: 'Converted' },
-            { value: 'LOST', label: 'Lost' },
-          ]}
-          value={filter}
-          onChange={setFilter}
-          placeholder="All Leads"
-        />
+        <div className="flex items-center gap-3">
+          <div className="flex gap-1">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => exportCsv(getExportData(), exportColumns, 'leads')}
+            >
+              <Download className="w-4 h-4 mr-1" /> CSV
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => exportPdf(getExportData(), exportColumns, 'leads', 'Leads Report')}
+            >
+              <Download className="w-4 h-4 mr-1" /> PDF
+            </Button>
+          </div>
+          <Select
+            options={[
+              { value: 'NEW', label: 'New' },
+              { value: 'CONTACTED', label: 'Contacted' },
+              { value: 'QUALIFIED', label: 'Qualified' },
+              { value: 'CONVERTED', label: 'Converted' },
+              { value: 'LOST', label: 'Lost' },
+            ]}
+            value={filter}
+            onChange={setFilter}
+            placeholder="All Leads"
+          />
+        </div>
       </div>
 
       {leads.length > 0 ? (
-        <div className="space-y-4">
-          {leads.map((lead) => (
-            <Card key={lead.id}>
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h3 className="font-semibold text-lg">{lead.name}</h3>
-                    {getStatusBadge(lead.status)}
-                    {lead.aiScore && (
-                      <div className={`flex items-center gap-1 ${getScoreColor(lead.aiScore)}`}>
-                        <TrendingUp className="w-4 h-4" />
-                        <span className="text-sm font-medium">
-                          {Math.round(lead.aiScore * 100)}% quality
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="flex flex-wrap gap-4 text-sm text-gray-600">
-                    <a
-                      href={`mailto:${lead.email}`}
-                      className="flex items-center gap-1 hover:text-blue-600"
-                    >
-                      <Mail className="w-4 h-4" />
-                      {lead.email}
-                    </a>
-                    {lead.phone && (
-                      <a
-                        href={`tel:${lead.phone}`}
-                        className="flex items-center gap-1 hover:text-blue-600"
-                      >
-                        <Phone className="w-4 h-4" />
-                        {lead.phone}
-                      </a>
-                    )}
-                    <span className="text-gray-400">
-                      Source: {lead.source || 'Unknown'}
-                    </span>
-                    <span className="text-gray-400">
-                      {format(new Date(lead.createdAt), 'MMM d, yyyy')}
-                    </span>
-                  </div>
-
-                  {lead.notes && (
-                    <p className="mt-2 text-sm text-gray-500">{lead.notes}</p>
-                  )}
-                </div>
-
-                <div className="flex gap-2">
-                  {lead.status === 'NEW' && (
-                    <Button
-                      size="sm"
-                      onClick={() => updateLeadStatus(lead.id, 'CONTACTED')}
-                    >
-                      Mark Contacted
-                    </Button>
-                  )}
-                  {lead.status === 'CONTACTED' && (
-                    <>
-                      <Button
-                        size="sm"
-                        onClick={() => updateLeadStatus(lead.id, 'QUALIFIED')}
-                      >
-                        Qualify
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        onClick={() => updateLeadStatus(lead.id, 'LOST')}
-                      >
-                        Lost
-                      </Button>
-                    </>
-                  )}
-                  {lead.status === 'QUALIFIED' && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => updateLeadStatus(lead.id, 'CONVERTED')}
-                    >
-                      Convert
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </Card>
-          ))}
-        </div>
+        <DataTable
+          data={leads}
+          columns={columns}
+          selectable
+          selectedIds={selection.selectedIds}
+          onToggleSelect={selection.toggle}
+          onToggleSelectAll={selection.toggleAll}
+          allSelected={selection.allSelected}
+          someSelected={selection.someSelected}
+          onRowClick={setSelectedLead}
+        />
       ) : (
         <Card>
           <div className="text-center py-8">
@@ -191,6 +283,22 @@ export default function LeadsPage() {
           </div>
         </Card>
       )}
+
+      <BulkActionBar
+        selectedCount={selection.selectedCount}
+        onClear={selection.clearSelection}
+        actions={[
+          { label: 'Mark Contacted', onClick: () => handleBulkStatusUpdate('CONTACTED') },
+          { label: 'Delete', onClick: handleBulkDelete, variant: 'danger' },
+        ]}
+      />
+
+      <LeadDetailModal
+        lead={selectedLead}
+        isOpen={!!selectedLead}
+        onClose={() => setSelectedLead(null)}
+        onUpdate={fetchLeads}
+      />
     </div>
   );
 }

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import SessionProvider from "@/components/providers/SessionProvider";
+import ToastProvider from "@/components/providers/ToastProvider";
+import ConfirmProvider from "@/components/providers/ConfirmProvider";
 import ChatWidget from "@/components/chat/ChatWidget";
 
 export const metadata: Metadata = {
@@ -17,8 +19,12 @@ export default function RootLayout({
     <html lang="en">
       <body className="antialiased">
         <SessionProvider>
-          {children}
-          <ChatWidget />
+          <ToastProvider>
+            <ConfirmProvider>
+              {children}
+              <ChatWidget />
+            </ConfirmProvider>
+          </ToastProvider>
         </SessionProvider>
       </body>
     </html>

@@ -9,7 +9,11 @@ import Textarea from '@/components/ui/Textarea';
 import Select from '@/components/ui/Select';
 import Modal from '@/components/ui/Modal';
 import Loading from '@/components/ui/Loading';
-import { Wrench, Plus, Edit, Trash2 } from 'lucide-react';
+import ServiceDetailModal from '@/components/dashboard/ServiceDetailModal';
+import { useToast } from '@/hooks/useToast';
+import { exportCsv } from '@/lib/exportCsv';
+import { exportPdf } from '@/lib/exportPdf';
+import { Wrench, Plus, Edit, Download } from 'lucide-react';
 
 export default function ServicesPage() {
   const { data: session } = useSession();
@@ -18,6 +22,8 @@ export default function ServicesPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [selectedService, setSelectedService] = useState<any>(null);
+  const { addToast } = useToast();
   const [form, setForm] = useState({
     id: '',
     name: '',
@@ -99,15 +105,33 @@ export default function ServicesPage() {
       });
 
       if (res.ok) {
+        addToast({ type: 'success', message: form.id ? 'Service updated' : 'Service added' });
         setShowModal(false);
         fetchData();
       }
     } catch (error) {
-      console.error('Error saving service:', error);
+      addToast({ type: 'error', message: 'Failed to save service' });
     } finally {
       setSaving(false);
     }
   };
+
+  const exportColumns = [
+    { key: 'name', header: 'Name' },
+    { key: 'category', header: 'Category' },
+    { key: 'price', header: 'Price' },
+    { key: 'type', header: 'Price Type' },
+    { key: 'duration', header: 'Duration' },
+  ];
+
+  const getExportData = () =>
+    services.map((s) => ({
+      name: s.name,
+      category: s.category?.name || '-',
+      price: s.price ? `$${s.price}` : 'Quote',
+      type: s.priceType || '-',
+      duration: s.duration ? `${s.duration} mins` : '-',
+    }));
 
   if (loading) {
     return <Loading text="Loading services..." />;
@@ -120,19 +144,41 @@ export default function ServicesPage() {
           <h1 className="text-2xl font-bold text-gray-900">Services</h1>
           <p className="text-gray-600">Manage your service offerings</p>
         </div>
-        <Button onClick={() => openModal()}>
-          <Plus className="w-4 h-4 mr-2" />
-          Add Service
-        </Button>
+        <div className="flex items-center gap-3">
+          <div className="flex gap-1">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => exportCsv(getExportData(), exportColumns, 'services')}
+            >
+              <Download className="w-4 h-4 mr-1" /> CSV
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => exportPdf(getExportData(), exportColumns, 'services', 'Services Report')}
+            >
+              <Download className="w-4 h-4 mr-1" /> PDF
+            </Button>
+          </div>
+          <Button onClick={() => openModal()}>
+            <Plus className="w-4 h-4 mr-2" />
+            Add Service
+          </Button>
+        </div>
       </div>
 
       {services.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {services.map((service) => (
-            <Card key={service.id}>
+            <Card
+              key={service.id}
+              hover
+              onClick={() => setSelectedService(service)}
+            >
               <div className="flex items-start justify-between mb-2">
                 <h3 className="font-semibold">{service.name}</h3>
-                <div className="flex gap-1">
+                <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
                   <button
                     onClick={() => openModal(service)}
                     className="p-1 text-gray-400 hover:text-blue-600"
@@ -245,6 +291,18 @@ export default function ServicesPage() {
           </div>
         </form>
       </Modal>
+
+      {/* Service Detail Modal */}
+      {selectedService && (
+        <ServiceDetailModal
+          service={selectedService}
+          categories={categories}
+          businessId={session?.user?.businessId || ''}
+          isOpen={!!selectedService}
+          onClose={() => setSelectedService(null)}
+          onUpdate={fetchData}
+        />
+      )}
     </div>
   );
 }

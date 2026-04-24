@@ -2,9 +2,10 @@
 
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import DashboardSidebar from '@/components/layout/DashboardSidebar';
 import Loading from '@/components/ui/Loading';
+import { Menu } from 'lucide-react';
 
 export default function DashboardLayout({
   children,
@@ -13,6 +14,7 @@ export default function DashboardLayout({
 }) {
   const { data: session, status } = useSession();
   const router = useRouter();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     if (status === 'unauthenticated') {
@@ -32,8 +34,20 @@ export default function DashboardLayout({
 
   return (
     <div className="flex min-h-screen bg-gray-50">
-      <DashboardSidebar />
-      <main className="flex-1 p-8">{children}</main>
+      <DashboardSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <main className="flex-1 min-w-0">
+        {/* Mobile header */}
+        <div className="lg:hidden sticky top-0 z-30 bg-white border-b px-4 py-3 flex items-center gap-3">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="p-2 hover:bg-gray-100 rounded-lg"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+          <span className="font-semibold text-gray-900">Dashboard</span>
+        </div>
+        <div className="p-4 md:p-8">{children}</div>
+      </main>
     </div>
   );
 }

@@ -16,6 +16,7 @@ function RegisterForm() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [verificationToken, setVerificationToken] = useState('');
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -61,6 +62,11 @@ function RegisterForm() {
         throw new Error(data.error || 'Registration failed');
       }
 
+      // Show verification token if returned
+      if (data.verificationToken) {
+        setVerificationToken(data.verificationToken);
+      }
+
       // Sign in after registration
       const result = await signIn('credentials', {
         email: form.email,
@@ -71,7 +77,7 @@ function RegisterForm() {
       if (result?.error) {
         setError('Account created. Please sign in.');
         router.push('/login');
-      } else {
+      } else if (!data.verificationToken) {
         router.push(form.role === 'BUSINESS_OWNER' ? '/dashboard' : '/');
         router.refresh();
       }
@@ -81,6 +87,35 @@ function RegisterForm() {
       setLoading(false);
     }
   };
+
+  if (verificationToken) {
+    return (
+      <Card>
+        <div className="text-center py-4">
+          <div className="text-green-500 text-4xl mb-4">&#10003;</div>
+          <h3 className="text-lg font-semibold mb-2">Account Created!</h3>
+          <p className="text-gray-600 mb-4">
+            Please verify your email to complete registration.
+          </p>
+          <div className="bg-blue-50 p-4 rounded-lg mb-4">
+            <p className="text-xs text-gray-500 mb-1">Demo: Verification Token</p>
+            <p className="text-sm font-mono break-all text-blue-700">{verificationToken}</p>
+            <Link
+              href={`/verify-email?token=${verificationToken}`}
+              className="mt-2 inline-block text-sm text-blue-600 hover:text-blue-700 font-medium"
+            >
+              Click here to verify email
+            </Link>
+          </div>
+          <Button
+            onClick={() => router.push(form.role === 'BUSINESS_OWNER' ? '/dashboard' : '/')}
+          >
+            Continue to {form.role === 'BUSINESS_OWNER' ? 'Dashboard' : 'Home'}
+          </Button>
+        </div>
+      </Card>
+    );
+  }
 
   return (
     <Card>
