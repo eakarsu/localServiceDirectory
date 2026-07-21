@@ -1,5 +1,7 @@
 # Audit Apply Notes — localServiceDirectory
 
+> Historical note: the generated AI/gap scaffolds described below were removed by the 2026-07-20 completeness implementation. Operational decisions now use the deterministic field-service policy engine and fail-closed provider contracts documented in `README.md`.
+
 Source: `_AUDIT/reports/batch_10.md` § Partial-builds #27 localServiceDirectory
 
 ## Original audit recommendations

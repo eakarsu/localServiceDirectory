@@ -31,8 +31,8 @@ function ResetPasswordForm() {
       return;
     }
 
-    if (form.newPassword.length < 6) {
-      setError('Password must be at least 6 characters');
+    if (form.newPassword.length < 12) {
+      setError('Password must be at least 12 characters');
       return;
     }
 
@@ -95,7 +95,7 @@ function ResetPasswordForm() {
         <Input
           label="New Password"
           type="password"
-          placeholder="At least 6 characters"
+          placeholder="At least 12 characters"
           value={form.newPassword}
           onChange={(e) => setForm({ ...form, newPassword: e.target.value })}
           required

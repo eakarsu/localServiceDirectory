@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import prisma from '@/lib/prisma';
+import { digestToken } from '@/lib/security/tokens';
 
 export async function POST(request: NextRequest) {
   try {
@@ -13,15 +14,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (newPassword.length < 6) {
+    if (newPassword.length < 12) {
       return NextResponse.json(
-        { error: 'Password must be at least 6 characters' },
+        { error: 'Password must be at least 12 characters' },
         { status: 400 }
       );
     }
 
     const resetToken = await prisma.passwordResetToken.findUnique({
-      where: { token },
+      where: { token: digestToken(token) },
       include: { user: true },
     });
 

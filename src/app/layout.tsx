@@ -3,7 +3,6 @@ import "./globals.css";
 import SessionProvider from "@/components/providers/SessionProvider";
 import ToastProvider from "@/components/providers/ToastProvider";
 import ConfirmProvider from "@/components/providers/ConfirmProvider";
-import ChatWidget from "@/components/chat/ChatWidget";
 
 export const metadata: Metadata = {
   title: "LocalServices - Find Trusted Local Service Providers",
@@ -22,7 +21,6 @@ export default function RootLayout({
           <ToastProvider>
             <ConfirmProvider>
               {children}
-              <ChatWidget />
             </ConfirmProvider>
           </ToastProvider>
         </SessionProvider>

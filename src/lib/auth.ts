@@ -25,6 +25,10 @@ export const authOptions: NextAuthOptions = {
           throw new Error('User not found');
         }
 
+        if (!user.emailVerified) {
+          throw new Error('Email verification required');
+        }
+
         const isPasswordValid = await bcrypt.compare(
           credentials.password,
           user.password
@@ -54,11 +58,19 @@ export const authOptions: NextAuthOptions = {
       return token;
     },
     async session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.id as string;
-        session.user.role = token.role as string;
-        session.user.businessId = token.businessId as string | undefined;
+      if (!session.user || typeof token.id !== 'string') return session;
+      const currentUser = await prisma.user.findUnique({
+        where: { id: token.id },
+        include: { business: true },
+      });
+      if (!currentUser?.emailVerified) {
+        throw new Error('Session user is no longer active');
       }
+      session.user.id = currentUser.id;
+      session.user.email = currentUser.email;
+      session.user.name = currentUser.name;
+      session.user.role = currentUser.role;
+      session.user.businessId = currentUser.business?.id;
       return session;
     },
   },

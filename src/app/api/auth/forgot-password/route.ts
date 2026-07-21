@@ -1,14 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
-import { v4 as uuidv4 } from 'uuid';
+import { z } from 'zod';
+import { createOpaqueToken, digestToken, publicAppUrl } from '@/lib/security/tokens';
+
+const forgotPasswordSchema = z.object({
+  email: z.string().email().max(320).transform((email) => email.trim().toLowerCase()),
+});
 
 export async function POST(request: NextRequest) {
   try {
-    const { email } = await request.json();
-
-    if (!email) {
+    const parsed = forgotPasswordSchema.safeParse(await request.json().catch(() => null));
+    if (!parsed.success) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 });
     }
+    const { email } = parsed.data;
 
     const user = await prisma.user.findUnique({ where: { email } });
 
@@ -19,29 +24,31 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Invalidate existing tokens
-    await prisma.passwordResetToken.updateMany({
-      where: { userId: user.id, used: false },
-      data: { used: true },
-    });
-
-    // Create new token
-    const token = uuidv4();
+    const token = createOpaqueToken();
     const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
-
-    await prisma.passwordResetToken.create({
-      data: {
-        token,
-        userId: user.id,
-        expiresAt,
-      },
+    await prisma.$transaction(async (tx) => {
+      await tx.passwordResetToken.updateMany({
+        where: { userId: user.id, used: false },
+        data: { used: true },
+      });
+      await tx.passwordResetToken.create({
+        data: { token: digestToken(token), userId: user.id, expiresAt },
+      });
+      await tx.outboxEvent.create({
+        data: {
+          topic: 'auth.reset-password',
+          aggregateId: user.id,
+          idempotencyKey: `auth.reset-password:${user.id}:${expiresAt.toISOString()}`,
+          payload: {
+            recipient: user.email,
+            name: user.name,
+            url: publicAppUrl('/reset-password', token),
+          },
+        },
+      });
     });
-
-    // In production, send email with reset link
-    // For demo, return the token directly
     return NextResponse.json({
-      message: 'If an account exists with that email, a reset token has been generated.',
-      token, // Remove in production - only for demo
+      message: 'If an account exists with that email, a reset link has been sent.',
     });
   } catch (error) {
     console.error('Forgot password error:', error);

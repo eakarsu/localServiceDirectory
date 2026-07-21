@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import prisma from '@/lib/prisma';
 import { authOptions } from '@/lib/auth';
+import { QuoteStatus } from '@prisma/client';
+import { z } from 'zod';
+
+const responseSchema = z.object({
+  amountCents: z.number().int().nonnegative(),
+  description: z.string().min(1).max(5000),
+  validDays: z.number().int().min(1).max(90).default(7),
+  terms: z.string().max(5000).optional(),
+});
 
 export async function POST(
   request: NextRequest,
@@ -28,34 +37,50 @@ export async function POST(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const { price, description, validDays } = await request.json();
+    const parsed = responseSchema.safeParse(await request.json().catch(() => null));
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Invalid quote response', issues: parsed.error.flatten() },
+        { status: 400 },
+      );
+    }
+    if (quoteRequest.status !== QuoteStatus.PENDING && quoteRequest.status !== QuoteStatus.DRAFT) {
+      return NextResponse.json({ error: 'Quote request is no longer open' }, { status: 409 });
+    }
 
     const validUntil = new Date();
-    validUntil.setDate(validUntil.getDate() + (validDays || 7));
+    validUntil.setUTCDate(validUntil.getUTCDate() + parsed.data.validDays);
 
-    const quote = await prisma.quote.create({
-      data: {
-        quoteRequestId: id,
-        price,
-        description,
-        validUntil,
-      },
-    });
-
-    await prisma.quoteRequest.update({
-      where: { id },
-      data: { status: 'SENT' },
-    });
-
-    // Notify user
-    await prisma.notification.create({
-      data: {
-        userId: quoteRequest.userId,
-        type: 'quote',
-        title: 'Quote Received',
-        message: `${quoteRequest.business.name} sent you a quote for $${price}`,
-        link: '/my-bookings',
-      },
+    const quote = await prisma.$transaction(async (tx) => {
+      const created = await tx.quote.create({
+        data: {
+          quoteRequestId: id,
+          price: parsed.data.amountCents / 100,
+          amountCents: parsed.data.amountCents,
+          description: parsed.data.description,
+          terms: parsed.data.terms,
+          validUntil,
+        },
+      });
+      await tx.quoteRequest.update({ where: { id }, data: { status: QuoteStatus.SENT } });
+      await tx.notification.create({
+        data: {
+          userId: quoteRequest.userId,
+          type: 'quote',
+          title: 'Quote received',
+          message: `${quoteRequest.business.name} sent a quote`,
+          link: '/my-bookings',
+        },
+      });
+      await tx.outboxEvent.create({
+        data: {
+          topic: 'quote.sent',
+          aggregateId: id,
+          idempotencyKey: `quote.sent:${id}:${created.version}`,
+          payload: { quoteRequestId: id, quoteId: created.id },
+        },
+      });
+      return created;
     });
 
     return NextResponse.json(quote);

@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, Suspense } from 'react';
-import { signIn } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import Button from '@/components/ui/Button';
@@ -16,7 +15,7 @@ function RegisterForm() {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [verificationToken, setVerificationToken] = useState('');
+  const [registered, setRegistered] = useState(false);
   const [form, setForm] = useState({
     name: '',
     email: '',
@@ -37,8 +36,8 @@ function RegisterForm() {
       return;
     }
 
-    if (form.password.length < 6) {
-      setError('Password must be at least 6 characters');
+    if (form.password.length < 12) {
+      setError('Password must be at least 12 characters');
       setLoading(false);
       return;
     }
@@ -62,25 +61,7 @@ function RegisterForm() {
         throw new Error(data.error || 'Registration failed');
       }
 
-      // Show verification token if returned
-      if (data.verificationToken) {
-        setVerificationToken(data.verificationToken);
-      }
-
-      // Sign in after registration
-      const result = await signIn('credentials', {
-        email: form.email,
-        password: form.password,
-        redirect: false,
-      });
-
-      if (result?.error) {
-        setError('Account created. Please sign in.');
-        router.push('/login');
-      } else if (!data.verificationToken) {
-        router.push(form.role === 'BUSINESS_OWNER' ? '/dashboard' : '/');
-        router.refresh();
-      }
+      setRegistered(true);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -88,7 +69,7 @@ function RegisterForm() {
     }
   };
 
-  if (verificationToken) {
+  if (registered) {
     return (
       <Card>
         <div className="text-center py-4">
@@ -97,20 +78,11 @@ function RegisterForm() {
           <p className="text-gray-600 mb-4">
             Please verify your email to complete registration.
           </p>
-          <div className="bg-blue-50 p-4 rounded-lg mb-4">
-            <p className="text-xs text-gray-500 mb-1">Demo: Verification Token</p>
-            <p className="text-sm font-mono break-all text-blue-700">{verificationToken}</p>
-            <Link
-              href={`/verify-email?token=${verificationToken}`}
-              className="mt-2 inline-block text-sm text-blue-600 hover:text-blue-700 font-medium"
-            >
-              Click here to verify email
-            </Link>
-          </div>
-          <Button
-            onClick={() => router.push(form.role === 'BUSINESS_OWNER' ? '/dashboard' : '/')}
-          >
-            Continue to {form.role === 'BUSINESS_OWNER' ? 'Dashboard' : 'Home'}
+          <p className="bg-blue-50 p-4 rounded-lg mb-4 text-sm text-blue-800">
+            We sent a one-time verification link to {form.email}. The link expires in 24 hours.
+          </p>
+          <Button onClick={() => router.push('/login')}>
+            Continue to sign in
           </Button>
         </div>
       </Card>
@@ -180,7 +152,7 @@ function RegisterForm() {
         <Input
           label="Password"
           type="password"
-          placeholder="At least 6 characters"
+          placeholder="At least 12 characters"
           value={form.password}
           onChange={(e) => setForm({ ...form, password: e.target.value })}
           required

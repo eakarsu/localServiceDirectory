@@ -61,12 +61,16 @@ export default function BookingForm({
     try {
       const res = await fetch('/api/bookings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': crypto.randomUUID(),
+        },
         body: JSON.stringify({
           businessId,
           serviceId: form.serviceId || undefined,
           date: form.date,
           startTime: form.startTime,
+          durationMinutes: selectedService?.duration || 60,
           notes: form.notes,
         }),
       });

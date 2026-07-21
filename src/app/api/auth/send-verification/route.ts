@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 import prisma from '@/lib/prisma';
-import { v4 as uuidv4 } from 'uuid';
+import { createOpaqueToken, digestToken, publicAppUrl } from '@/lib/security/tokens';
 
 export async function POST(request: NextRequest) {
   try {
@@ -24,27 +24,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Email already verified' }, { status: 400 });
     }
 
-    // Invalidate existing tokens
-    await prisma.emailVerificationToken.updateMany({
-      where: { userId: user.id, used: false },
-      data: { used: true },
-    });
-
-    const token = uuidv4();
+    const token = createOpaqueToken();
     const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
-
-    await prisma.emailVerificationToken.create({
-      data: {
-        token,
-        userId: user.id,
-        expiresAt,
-      },
+    await prisma.$transaction(async (tx) => {
+      await tx.emailVerificationToken.updateMany({
+        where: { userId: user.id, used: false },
+        data: { used: true },
+      });
+      await tx.emailVerificationToken.create({
+        data: { token: digestToken(token), userId: user.id, expiresAt },
+      });
+      await tx.outboxEvent.create({
+        data: {
+          topic: 'auth.verify-email',
+          aggregateId: user.id,
+          idempotencyKey: `auth.verify-email:${user.id}:${expiresAt.toISOString()}`,
+          payload: {
+            recipient: user.email,
+            name: user.name,
+            url: publicAppUrl('/verify-email', token),
+          },
+        },
+      });
     });
-
-    // In production, send email with verification link
     return NextResponse.json({
       message: 'Verification email sent.',
-      token, // Remove in production - only for demo
     });
   } catch (error) {
     console.error('Send verification error:', error);

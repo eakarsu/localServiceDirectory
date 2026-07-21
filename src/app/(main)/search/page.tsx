@@ -8,6 +8,8 @@ import prisma from '@/lib/prisma';
 import Link from 'next/link';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
+export const dynamic = 'force-dynamic';
+
 interface SearchPageProps {
   searchParams: Promise<{
     q?: string;

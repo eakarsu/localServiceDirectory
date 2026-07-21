@@ -5,6 +5,8 @@ import Footer from '@/components/layout/Footer';
 import BusinessCard from '@/components/business/BusinessCard';
 import prisma from '@/lib/prisma';
 
+export const dynamic = 'force-dynamic';
+
 async function getFeaturedBusinesses() {
   return prisma.business.findMany({
     where: { active: true, featured: true },

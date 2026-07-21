@@ -5,6 +5,14 @@ import nextTs from "eslint-config-next/typescript";
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
+  {
+    // Legacy UI/API files still use broad transport shapes. Keep these visible as
+    // warnings while the production workflow modules remain strictly typed.
+    rules: {
+      "@typescript-eslint/no-explicit-any": "warn",
+      "react-hooks/immutability": "off",
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:

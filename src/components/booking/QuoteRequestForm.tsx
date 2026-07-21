@@ -49,7 +49,10 @@ export default function QuoteRequestForm({
     try {
       const res = await fetch('/api/quotes', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Idempotency-Key': crypto.randomUUID(),
+        },
         body: JSON.stringify({
           businessId,
           ...form,

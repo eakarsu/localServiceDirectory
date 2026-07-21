@@ -10,7 +10,6 @@ export default function ForgotPasswordPage() {
   const [loading, setLoading] = useState(false);
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
-  const [token, setToken] = useState('');
   const [submitted, setSubmitted] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -32,9 +31,6 @@ export default function ForgotPasswordPage() {
       }
 
       setSubmitted(true);
-      if (data.token) {
-        setToken(data.token);
-      }
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -63,18 +59,6 @@ export default function ForgotPasswordPage() {
               <p className="text-gray-600 mb-4">
                 If an account exists with that email, a reset link has been sent.
               </p>
-              {token && (
-                <div className="bg-blue-50 p-4 rounded-lg mb-4">
-                  <p className="text-xs text-gray-500 mb-1">Demo: Reset Token</p>
-                  <p className="text-sm font-mono break-all text-blue-700">{token}</p>
-                  <Link
-                    href={`/reset-password?token=${token}`}
-                    className="mt-2 inline-block text-sm text-blue-600 hover:text-blue-700 font-medium"
-                  >
-                    Click here to reset password
-                  </Link>
-                </div>
-              )}
               <Link href="/login" className="text-blue-600 hover:text-blue-700 font-medium text-sm">
                 Back to login
               </Link>

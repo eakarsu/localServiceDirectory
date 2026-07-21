@@ -1,13 +1,38 @@
-import { PrismaClient, UserRole, DayOfWeek, BookingStatus, ReviewStatus, LeadStatus, QuoteStatus } from '@prisma/client';
+import { PrismaClient, UserRole, DayOfWeek, BookingStatus, ReviewStatus, LeadStatus, QuoteStatus, WorkOrderStatus } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
 async function main() {
+  if (
+    process.env.NODE_ENV === 'production' ||
+    process.env.ALLOW_DESTRUCTIVE_DEMO_SEED !== 'true'
+  ) {
+    throw new Error(
+      'Demo seed refused: set ALLOW_DESTRUCTIVE_DEMO_SEED=true in a disposable development database.',
+    );
+  }
   console.log('Seeding database with comprehensive data...');
 
   // Clear existing data
   console.log('Clearing existing data...');
+  await prisma.refund.deleteMany();
+  await prisma.payment.deleteMany();
+  await prisma.invoice.deleteMany();
+  await prisma.changeOrder.deleteMany();
+  await prisma.jobEvent.deleteMany();
+  await prisma.dispatchAssignment.deleteMany();
+  await prisma.inventoryReservation.deleteMany();
+  await prisma.customerCommunication.deleteMany();
+  await prisma.offlineCommand.deleteMany();
+  await prisma.workOrder.deleteMany();
+  await prisma.webhookEvent.deleteMany();
+  await prisma.outboxEvent.deleteMany();
+  await prisma.externalOperation.deleteMany();
+  await prisma.providerConnection.deleteMany();
+  await prisma.availabilityWindow.deleteMany();
+  await prisma.technician.deleteMany();
+  await prisma.inventoryItem.deleteMany();
   await prisma.passwordResetToken.deleteMany();
   await prisma.emailVerificationToken.deleteMany();
   await prisma.businessAnalytics.deleteMany();
@@ -24,6 +49,7 @@ async function main() {
   await prisma.chatSession.deleteMany();
   await prisma.advertisement.deleteMany();
   await prisma.service.deleteMany();
+  await prisma.skill.deleteMany();
   await prisma.serviceArea.deleteMany();
   await prisma.businessHours.deleteMany();
   await prisma.businessVideo.deleteMany();
@@ -99,7 +125,7 @@ async function main() {
   // ============================================
   console.log('Creating users...');
 
-  const hashedPassword = await bcrypt.hash('password123', 10);
+  const hashedPassword = await bcrypt.hash('Development-Only-Password-123!', 12);
 
   // Consumer users
   const consumers = await Promise.all([
@@ -136,6 +162,7 @@ async function main() {
 
   // Admin user
   await prisma.user.create({ data: { email: 'admin@example.com', password: hashedPassword, name: 'Admin User', role: UserRole.ADMIN } });
+  await prisma.user.updateMany({ data: { emailVerified: new Date() } });
 
   // ============================================
   // BUSINESSES (15+ businesses)
@@ -550,6 +577,22 @@ async function main() {
 
   const bookingStatuses = [BookingStatus.PENDING, BookingStatus.CONFIRMED, BookingStatus.COMPLETED, BookingStatus.CANCELLED];
 
+  const availabilityStart = new Date();
+  availabilityStart.setDate(availabilityStart.getDate() - 14);
+  availabilityStart.setHours(0, 0, 0, 0);
+  const availabilityEnd = new Date();
+  availabilityEnd.setDate(availabilityEnd.getDate() + 90);
+  availabilityEnd.setHours(23, 59, 59, 999);
+  await prisma.availabilityWindow.createMany({
+    data: businesses.map((business) => ({
+      businessId: business.id,
+      startsAt: availabilityStart,
+      endsAt: availabilityEnd,
+      capacity: 4,
+      source: 'development-seed',
+    })),
+  });
+
   for (let i = 0; i < 20; i++) {
     const businessIdx = i % businesses.length;
     const userIdx = i % consumers.length;
@@ -559,17 +602,34 @@ async function main() {
     date.setDate(date.getDate() + daysAhead);
     const status = daysAhead < -2 ? BookingStatus.COMPLETED : daysAhead < 0 ? BookingStatus.CONFIRMED : bookingStatuses[i % 4];
 
+    const startHour = 9 + (i % 8);
+    const scheduledStart = new Date(date);
+    scheduledStart.setHours(startHour, 0, 0, 0);
+    const scheduledEnd = new Date(scheduledStart.getTime() + 60 * 60 * 1000);
+    const amountCents = (100 + (i * 25)) * 100;
     await prisma.booking.create({
       data: {
         businessId: businesses[businessIdx].id,
         userId: consumers[userIdx].id,
         serviceId: services[serviceIdx % services.length]?.id,
         date,
-        startTime: `${9 + (i % 8)}:00`,
-        endTime: `${10 + (i % 8)}:00`,
+        startTime: `${startHour.toString().padStart(2, '0')}:00`,
+        endTime: `${(startHour + 1).toString().padStart(2, '0')}:00`,
+        scheduledStart,
+        scheduledEnd,
         status,
-        totalPrice: 100 + (i * 25),
+        totalPrice: amountCents / 100,
+        amountCents,
         notes: `Booking ${i + 1} notes`,
+        workOrder: {
+          create: {
+            status: status === BookingStatus.COMPLETED
+              ? WorkOrderStatus.COMPLETED
+              : status === BookingStatus.CANCELLED
+                ? WorkOrderStatus.CANCELLED
+                : WorkOrderStatus.SCHEDULED,
+          },
+        },
       },
     });
   }
@@ -609,7 +669,7 @@ async function main() {
         details: `Detailed description for ${quoteDescriptions[i]}. Looking for professional service and competitive pricing.`,
         budget: `$${1000 + (i * 500)}-${2000 + (i * 500)}`,
         preferredDate: new Date(Date.now() + (7 + i) * 24 * 60 * 60 * 1000),
-        aiEstimate: 1500 + (i * 300),
+        status: i < 10 ? QuoteStatus.SENT : QuoteStatus.PENDING,
       },
     });
 
@@ -619,6 +679,7 @@ async function main() {
         data: {
           quoteRequestId: quoteRequest.id,
           price: 1500 + (i * 250),
+          amountCents: (1500 + (i * 250)) * 100,
           description: `Professional quote for ${quoteDescriptions[i]}`,
           validUntil: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         },

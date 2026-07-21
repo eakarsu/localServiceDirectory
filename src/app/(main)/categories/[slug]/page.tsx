@@ -6,6 +6,8 @@ import BusinessCard from '@/components/business/BusinessCard';
 import prisma from '@/lib/prisma';
 import { ChevronRight } from 'lucide-react';
 
+export const dynamic = 'force-dynamic';
+
 interface CategoryPageProps {
   params: Promise<{ slug: string }>;
 }

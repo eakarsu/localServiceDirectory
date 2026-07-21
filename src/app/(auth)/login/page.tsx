@@ -109,12 +109,6 @@ export default function LoginPage() {
         <Suspense fallback={<Loading />}>
           <LoginForm />
         </Suspense>
-
-        <div className="mt-4 text-center text-sm text-gray-500">
-          <p>Demo accounts:</p>
-          <p>Consumer: consumer@example.com / password123</p>
-          <p>Business: plumber@example.com / password123</p>
-        </div>
       </div>
     </div>
   );

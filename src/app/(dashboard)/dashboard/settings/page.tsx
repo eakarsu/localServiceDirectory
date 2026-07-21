@@ -33,8 +33,8 @@ export default function SettingsPage() {
       return;
     }
 
-    if (passwordForm.newPassword.length < 6) {
-      addToast({ type: 'error', message: 'Password must be at least 6 characters' });
+    if (passwordForm.newPassword.length < 12) {
+      addToast({ type: 'error', message: 'Password must be at least 12 characters' });
       return;
     }
 

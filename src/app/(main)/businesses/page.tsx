@@ -5,6 +5,8 @@ import BusinessCard from '@/components/business/BusinessCard';
 import prisma from '@/lib/prisma';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
+export const dynamic = 'force-dynamic';
+
 interface BusinessesPageProps {
   searchParams: Promise<{
     page?: string;

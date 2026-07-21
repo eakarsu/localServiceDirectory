@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
+import { digestToken } from '@/lib/security/tokens';
 
 export async function POST(request: NextRequest) {
   try {
@@ -10,7 +11,7 @@ export async function POST(request: NextRequest) {
     }
 
     const verificationToken = await prisma.emailVerificationToken.findUnique({
-      where: { token },
+      where: { token: digestToken(token) },
       include: { user: true },
     });
 
