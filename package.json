@@ -23,7 +23,7 @@
     "setup:development": "npm run db:generate && npm run db:migrate:dev"
   },
   "dependencies": {
-    "@hookform/resolvers": "^5.2.2",
+    "@hookform/resolvers": "^5.4.0",
     "@prisma/client": "^5.22.0",
     "bcryptjs": "^3.0.3",
     "date-fns": "^4.1.0",
