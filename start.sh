@@ -1,50 +1,31 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
-script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-project_root="${RUNTIME_PROJECT_SOURCE:-$script_dir}"
-cd "$project_root"
-
-runtime_port="${PORT:-}"
-if [[ ! "$runtime_port" =~ ^[0-9]+$ ]] || (( runtime_port < 1024 || runtime_port > 65535 )); then
-  echo "ERROR: PORT must be an explicitly assigned numeric port between 1024 and 65535." >&2
-  exit 1
-fi
-if lsof -tiTCP:"$runtime_port" -sTCP:LISTEN >/dev/null 2>&1; then
-  echo "ERROR: assigned port $runtime_port is already occupied." >&2
-  exit 1
-fi
-
-required=(DATABASE_URL NEXTAUTH_URL NEXTAUTH_SECRET)
-for name in "${required[@]}"; do
-  if [[ -z "${!name:-}" ]]; then
-    echo "ERROR: ${name} must be set." >&2
-    exit 1
-  fi
-done
-
-if [[ "${NODE_ENV:-production}" == "production" ]]; then
-  if [[ ${#NEXTAUTH_SECRET} -lt 32 ]]; then
-    echo "ERROR: NEXTAUTH_SECRET must contain at least 32 characters." >&2
-    exit 1
-  fi
-  if [[ "${NEXTAUTH_URL}" != https://* && "${ALLOW_INSECURE_HTTP:-0}" != "1" ]]; then
-    echo "ERROR: NEXTAUTH_URL must use HTTPS in production." >&2
-    exit 1
-  fi
-fi
-
-if [[ ! -d node_modules ]]; then
-  echo "ERROR: dependencies are not installed; run npm ci during the build phase." >&2
-  exit 1
-fi
-
-if [[ "${NODE_ENV:-production}" == "production" ]]; then
-  if [[ ! -d .next ]]; then
-    echo "ERROR: production build is missing; run npm run build before startup." >&2
-    exit 1
-  fi
-  exec npm run start -- --hostname 127.0.0.1 --port "$runtime_port"
-fi
-
-exec npm run dev -- --hostname 127.0.0.1 --port "$runtime_port"
+# Runtime governance modes: check|migrate|build|start. Prisma migrations remain explicit.
+PROJECT_DIR="$(cd "$(dirname "$0")" && pwd)"
+ENV_FILE="$PROJECT_DIR/.env"
+load_env_file(){ local line key value;while IFS= read -r line||[ -n "$line" ];do [[ "$line" =~ ^[[:space:]]*# || "$line" =~ ^[[:space:]]*$ ]]&&continue;line="${line#export }";key="${line%%=*}";value="${line#*=}";key="${key//[[:space:]]/}";[[ "$key" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]||continue;[ -n "${!key+x}" ]&&continue;if [[ "$value" == \"*\" && "$value" == *\" ]];then value="${value:1:${#value}-2}";elif [[ "$value" == \'*\' && "$value" == *\' ]];then value="${value:1:${#value}-2}";fi;export "$key=$value";done < "$ENV_FILE"; }
+[ -f "$ENV_FILE" ]||{ echo "Missing required file: $ENV_FILE" >&2;exit 1; };load_env_file
+export PATH="/opt/homebrew/bin:$PATH"
+case "${1:-start}" in
+  check) cd "$PROJECT_DIR";npm run db:validate&&npm run lint&&npm run typecheck;exit ;;
+  migrate) [[ "${ALLOW_SCHEMA_MIGRATION:-}" =~ ^(1|true)$ ]]||{ echo "Set ALLOW_SCHEMA_MIGRATION=1 for explicit migration" >&2;exit 1; };cd "$PROJECT_DIR";exec npm run db:migrate:deploy ;;
+  build) cd "$PROJECT_DIR";exec npm run build ;;
+  start) ;;
+  *) echo "Usage: $0 [start|check|migrate|build]" >&2;exit 64 ;;
+esac
+: "${BACKEND_PORT:?BACKEND_PORT is required}";: "${FRONTEND_PORT:?FRONTEND_PORT is required}";: "${DATABASE_URL:?DATABASE_URL is required}"
+: "${OPENROUTER_API_KEY:?OPENROUTER_API_KEY is required}";: "${OPENROUTER_MODEL:?OPENROUTER_MODEL is required}"
+[ "${OPENROUTER_BASE_URL:-}" = "https://openrouter.ai/api/v1" ]||{ echo "Exact OPENROUTER_BASE_URL is required" >&2;exit 1; }
+[ "$BACKEND_PORT" != "$FRONTEND_PORT" ]||{ echo "Assigned ports must differ" >&2;exit 1; }
+for assigned_port in "$BACKEND_PORT" "$FRONTEND_PORT";do [[ "$assigned_port" =~ ^[0-9]+$ ]]||exit 1;nc -z 127.0.0.1 "$assigned_port" >/dev/null 2>&1&&{ echo "Assigned port $assigned_port is occupied" >&2;exit 1; };done
+[ -d "$PROJECT_DIR/node_modules" ]&&[ -d "$PROJECT_DIR/runtime" ]||{ echo "Runtime dependencies are missing" >&2;exit 1; }
+export RUNTIME_PROJECT_NAME=localServiceDirectory RUNTIME_AI_ENDPOINT=/api/ai/local-service-operations-review RUNTIME_AI_FEATURE=local-service-operations-review
+export RUNTIME_AI_SYSTEM_PROMPT='You are a governed local-service operations assistant. Review quotes, booking, dispatch, technician scope, inventory, invoices, payments, refunds, external-provider evidence, and human approval gates.'
+node "$PROJECT_DIR/runtime/setup.mjs"
+CHILD_PIDS=()
+(cd "$PROJECT_DIR"&&exec node runtime/api.mjs)&CHILD_PIDS+=("$!")
+(cd "$PROJECT_DIR"&&exec npm run dev -- --hostname 127.0.0.1 --port "$FRONTEND_PORT")&CHILD_PIDS+=("$!")
+kill_tree(){ local pid="$1" child;for child in $(pgrep -P "$pid" 2>/dev/null||true);do kill_tree "$child";done;kill -TERM "$pid" 2>/dev/null||true; }
+cleanup(){ trap - EXIT INT TERM;for pid in "${CHILD_PIDS[@]}";do kill_tree "$pid";done;for pid in "${CHILD_PIDS[@]}";do wait "$pid" 2>/dev/null||true;done; }
+trap cleanup EXIT INT TERM
+wait "${CHILD_PIDS[@]}"

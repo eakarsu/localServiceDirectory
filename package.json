@@ -30,8 +30,8 @@
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.7",
     "lucide-react": "^0.555.0",
-    "next": "16.2.10",
-    "next-auth": "4.24.14",
+    "next": "16.2.11",
+    "next-auth": "4.24.15",
     "prisma": "^5.22.0",
     "react": "19.2.7",
     "react-dom": "19.2.7",
@@ -45,7 +45,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^9.39.2",
-    "eslint-config-next": "16.2.10",
+    "eslint-config-next": "16.2.11",
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
     "tsx": "^4.20.6",
@@ -61,7 +61,8 @@
     "brace-expansion@<1.1.13": "1.1.13",
     "brace-expansion@>=2.0.0 <2.0.3": "2.0.3",
     "minimatch@<3.1.4": "3.1.4",
-    "minimatch@>=9.0.0 <9.0.7": "9.0.7"
+    "minimatch@>=9.0.0 <9.0.7": "9.0.7",
+    "sharp": "0.35.3"
   },
   "prisma": {
     "seed": "npm run demo-data:load"
