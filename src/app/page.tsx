@@ -8,26 +8,34 @@ import prisma from '@/lib/prisma';
 export const dynamic = 'force-dynamic';
 
 async function getFeaturedBusinesses() {
-  return prisma.business.findMany({
-    where: { active: true, featured: true },
-    include: {
-      categories: true,
-      photos: { where: { isPrimary: true }, take: 1 },
-    },
-    orderBy: { avgRating: 'desc' },
-    take: 6,
-  });
+  try {
+    return await prisma.business.findMany({
+      where: { active: true, featured: true },
+      include: {
+        categories: true,
+        photos: { where: { isPrimary: true }, take: 1 },
+      },
+      orderBy: { avgRating: 'desc' },
+      take: 6,
+    });
+  } catch {
+    return [];
+  }
 }
 
 async function getCategories() {
-  return prisma.category.findMany({
-    where: { parentId: null },
-    include: {
-      _count: { select: { businesses: true } },
-    },
-    orderBy: { name: 'asc' },
-    take: 8,
-  });
+  try {
+    return await prisma.category.findMany({
+      where: { parentId: null },
+      include: {
+        _count: { select: { businesses: true } },
+      },
+      orderBy: { name: 'asc' },
+      take: 8,
+    });
+  } catch {
+    return [];
+  }
 }
 
 export default async function HomePage() {

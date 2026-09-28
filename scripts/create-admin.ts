@@ -8,9 +8,22 @@ async function main() {
     throw new Error('Refusing admin provisioning without BOOTSTRAP_ACKNOWLEDGEMENT=create-initial-admin');
   }
 
-  const email = (process.env.ADMIN_EMAIL || process.env.BOOTSTRAP_ADMIN_EMAIL || '').trim().toLowerCase();
-  const password = process.env.ADMIN_PASSWORD || process.env.BOOTSTRAP_ADMIN_PASSWORD || '';
-  const name = (process.env.BOOTSTRAP_ADMIN_NAME || 'Initial Administrator').trim();
+  const email = (
+    process.env.PROVISION_ADMIN_EMAIL ||
+    process.env.ADMIN_EMAIL ||
+    process.env.BOOTSTRAP_ADMIN_EMAIL ||
+    ''
+  ).trim().toLowerCase();
+  const password =
+    process.env.PROVISION_ADMIN_PASSWORD ||
+    process.env.ADMIN_PASSWORD ||
+    process.env.BOOTSTRAP_ADMIN_PASSWORD ||
+    '';
+  const name = (
+    process.env.PROVISION_ADMIN_NAME ||
+    process.env.BOOTSTRAP_ADMIN_NAME ||
+    'Initial Administrator'
+  ).trim();
   if (!email || !email.includes('@')) throw new Error('ADMIN_EMAIL must be a valid explicit address');
   if (password.length < 12) throw new Error('ADMIN_PASSWORD must contain at least 12 characters');
 

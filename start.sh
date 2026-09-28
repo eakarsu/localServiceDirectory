@@ -98,6 +98,12 @@ for assigned_port in "$BACKEND_PORT" "$FRONTEND_PORT";do [[ "$assigned_port" =~ 
 [ -d "$PROJECT_DIR/node_modules" ]&&[ -d "$PROJECT_DIR/runtime" ]||{ echo "Runtime dependencies are missing" >&2;exit 1; }
 export RUNTIME_PROJECT_NAME=localServiceDirectory RUNTIME_AI_ENDPOINT=/api/ai/local-service-operations-review RUNTIME_AI_FEATURE=local-service-operations-review
 export RUNTIME_AI_SYSTEM_PROMPT='You are a governed local-service operations assistant. Review quotes, booking, dispatch, technician scope, inventory, invoices, payments, refunds, external-provider evidence, and human approval gates.'
+if [ "${BOOTSTRAP_ACKNOWLEDGEMENT:-}" = create-initial-admin ]; then
+  if [[ "${ALLOW_SCHEMA_MIGRATION:-}" =~ ^(1|true)$ ]]; then
+    (cd "$PROJECT_DIR" && npm run db:migrate:deploy)
+  fi
+  (cd "$PROJECT_DIR" && npm run create-admin)
+fi
 node "$PROJECT_DIR/runtime/setup.mjs"
 CHILD_PIDS=()
 (cd "$PROJECT_DIR"&&exec node runtime/api.mjs)&CHILD_PIDS+=("$!")
