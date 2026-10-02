@@ -21,15 +21,14 @@ function LoginForm() {
     password: '',
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const signInWithCredentials = async (email: string, password: string) => {
     setLoading(true);
     setError('');
 
     try {
       const result = await signIn('credentials', {
-        email: form.email,
-        password: form.password,
+        email,
+        password,
         redirect: false,
       });
 
@@ -44,6 +43,24 @@ function LoginForm() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await signInWithCredentials(form.email, form.password);
+  };
+
+  const handleDemoLogin = async () => {
+    const demoEmail = process.env.NEXT_PUBLIC_DEMO_EMAIL;
+    const demoPassword = process.env.NEXT_PUBLIC_DEMO_PASSWORD;
+
+    if (!demoEmail || !demoPassword) {
+      setError('Demo credentials are not configured');
+      return;
+    }
+
+    setForm((current) => ({ ...current, email: demoEmail, password: demoPassword }));
+    await signInWithCredentials(demoEmail, demoPassword);
   };
 
   return (
@@ -75,7 +92,7 @@ function LoginForm() {
 
         <button
           type="button"
-          onClick={() => { setForm((current) => ({ ...current, email: process.env.NEXT_PUBLIC_DEMO_EMAIL || '', password: process.env.NEXT_PUBLIC_DEMO_PASSWORD || '' })); }}
+          onClick={handleDemoLogin}
           disabled={!process.env.NEXT_PUBLIC_DEMO_EMAIL || !process.env.NEXT_PUBLIC_DEMO_PASSWORD}
           aria-label="Auto Fill Demo Credentials"
           style={{ width: '100%', marginBottom: '12px', padding: '10px 14px', borderRadius: '8px', border: '1px solid currentColor', background: 'transparent', cursor: 'pointer' }}
