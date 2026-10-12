@@ -16,7 +16,7 @@ async function getFeaturedBusinesses() {
         photos: { where: { isPrimary: true }, take: 1 },
       },
       orderBy: { avgRating: 'desc' },
-      take: 6,
+      take: 15,
     });
   } catch {
     return [];
@@ -31,7 +31,7 @@ async function getCategories() {
         _count: { select: { businesses: true } },
       },
       orderBy: { name: 'asc' },
-      take: 8,
+      take: 15,
     });
   } catch {
     return [];

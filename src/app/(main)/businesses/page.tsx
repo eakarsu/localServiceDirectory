@@ -16,7 +16,7 @@ interface BusinessesPageProps {
 
 async function getBusinesses(params: any) {
   const page = parseInt(params.page || '1');
-  const limit = 12;
+  const limit = 15;
   const skip = (page - 1) * limit;
 
   const where: any = { active: true };

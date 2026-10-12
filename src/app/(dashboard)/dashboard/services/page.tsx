@@ -49,12 +49,12 @@ export default function ServicesPage() {
 
       if (catRes.ok) {
         const catData = await catRes.json();
-        setCategories(catData);
+        setCategories(Array.isArray(catData) ? catData : []);
       }
 
       if (servRes && servRes.ok) {
         const servData = await servRes.json();
-        setServices(servData);
+        setServices(Array.isArray(servData) ? servData : []);
       }
     } catch (error) {
       console.error('Error fetching data:', error);

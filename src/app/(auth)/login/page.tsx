@@ -50,7 +50,7 @@ function LoginForm() {
     await signInWithCredentials(form.email, form.password);
   };
 
-  const handleDemoLogin = async () => {
+  const handleDemoLogin = () => {
     const demoEmail = process.env.NEXT_PUBLIC_DEMO_EMAIL;
     const demoPassword = process.env.NEXT_PUBLIC_DEMO_PASSWORD;
 
@@ -60,7 +60,6 @@ function LoginForm() {
     }
 
     setForm((current) => ({ ...current, email: demoEmail, password: demoPassword }));
-    await signInWithCredentials(demoEmail, demoPassword);
   };
 
   return (
@@ -94,10 +93,10 @@ function LoginForm() {
           type="button"
           onClick={handleDemoLogin}
           disabled={!process.env.NEXT_PUBLIC_DEMO_EMAIL || !process.env.NEXT_PUBLIC_DEMO_PASSWORD}
-          aria-label="Auto Fill Demo Credentials"
+          aria-label="Fill demo credentials"
           style={{ width: '100%', marginBottom: '12px', padding: '10px 14px', borderRadius: '8px', border: '1px solid currentColor', background: 'transparent', cursor: 'pointer' }}
         >
-          Auto Fill Demo Credentials
+          Fill demo credentials
         </button>
         <Button type="submit" loading={loading} className="w-full">
           Sign In

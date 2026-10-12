@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 
 const menuItems = [
+  ...(process.env.NEXT_PUBLIC_NATIVE_AI_WORKSPACE_URL ? [{href:process.env.NEXT_PUBLIC_NATIVE_AI_WORKSPACE_URL,icon:MessageSquare,label:'AI workspace'}] : []),
   { href: '/dashboard', icon: LayoutDashboard, label: 'Overview' },
   { href: '/dashboard/profile', icon: Building2, label: 'Business Profile' },
   { href: '/dashboard/services', icon: Wrench, label: 'Services' },

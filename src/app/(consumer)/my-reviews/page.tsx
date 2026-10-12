@@ -33,7 +33,7 @@ export default function MyReviewsPage() {
       const res = await fetch(`/api/reviews?userId=${session?.user?.id}`);
       if (res.ok) {
         const data = await res.json();
-        setReviews(data.reviews);
+        setReviews(Array.isArray(data.reviews) ? data.reviews : []);
       }
     } catch (error) {
       console.error('Error fetching reviews:', error);

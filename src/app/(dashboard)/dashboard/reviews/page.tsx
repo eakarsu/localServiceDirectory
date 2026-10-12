@@ -43,7 +43,7 @@ export default function ReviewsPage() {
       const res = await fetch(`/api/reviews?businessId=${session.user.businessId}`);
       if (res.ok) {
         const data = await res.json();
-        setReviews(data.reviews);
+        setReviews(Array.isArray(data.reviews) ? data.reviews : []);
       }
     } catch (error) {
       console.error('Error fetching reviews:', error);

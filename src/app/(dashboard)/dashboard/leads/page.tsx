@@ -38,7 +38,7 @@ export default function LeadsPage() {
       const res = await fetch(`/api/leads?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
-        setLeads(data.leads);
+        setLeads(Array.isArray(data.leads) ? data.leads : []);
       }
     } catch (error) {
       console.error('Error fetching leads:', error);

@@ -25,8 +25,8 @@ export default function MessagesPage() {
       const res = await fetch('/api/messages');
       if (res.ok) {
         const data = await res.json();
-        setConversations(data.conversations);
-        setMessages(data.messages);
+        setConversations(Array.isArray(data.conversations) ? data.conversations : []);
+        setMessages(Array.isArray(data.messages) ? data.messages : []);
       }
     } catch (error) {
       console.error('Error fetching messages:', error);

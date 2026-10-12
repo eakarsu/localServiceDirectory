@@ -104,6 +104,8 @@ if [ "${BOOTSTRAP_ACKNOWLEDGEMENT:-}" = create-initial-admin ]; then
   fi
   (cd "$PROJECT_DIR" && npm run create-admin)
 fi
+echo "AI workspace: http://127.0.0.1:$BACKEND_PORT/ai-workspace"
+export VITE_NATIVE_AI_WORKSPACE_URL="http://127.0.0.1:$BACKEND_PORT/ai-workspace" NEXT_PUBLIC_NATIVE_AI_WORKSPACE_URL="http://127.0.0.1:$BACKEND_PORT/ai-workspace"
 node "$PROJECT_DIR/runtime/setup.mjs"
 CHILD_PIDS=()
 (cd "$PROJECT_DIR"&&exec node runtime/api.mjs)&CHILD_PIDS+=("$!")

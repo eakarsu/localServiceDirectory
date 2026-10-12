@@ -37,7 +37,7 @@ async function getBusinesses(categorySlug: string) {
       photos: { where: { isPrimary: true }, take: 1 },
     },
     orderBy: [{ featured: 'desc' }, { avgRating: 'desc' }],
-    take: 12,
+    take: 15,
   });
 }
 

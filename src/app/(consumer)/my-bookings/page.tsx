@@ -38,12 +38,12 @@ export default function MyBookingsPage() {
 
       if (bookingsRes.ok) {
         const data = await bookingsRes.json();
-        setBookings(data.bookings);
+        setBookings(Array.isArray(data.bookings) ? data.bookings : []);
       }
 
       if (quotesRes.ok) {
         const data = await quotesRes.json();
-        setQuoteRequests(data.quoteRequests);
+        setQuoteRequests(Array.isArray(data.quoteRequests) ? data.quoteRequests : []);
       }
     } catch (error) {
       console.error('Error fetching data:', error);
