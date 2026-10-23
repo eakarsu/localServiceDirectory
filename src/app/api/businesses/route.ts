@@ -7,6 +7,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const category = searchParams.get('category');
+    const search = searchParams.get('search');
     const city = searchParams.get('city');
     const featured = searchParams.get('featured');
     const limit = parseInt(searchParams.get('limit') || '20');
@@ -17,6 +18,14 @@ export async function GET(request: NextRequest) {
 
     if (category) {
       where.categories = { some: { slug: category } };
+    }
+
+    if (search) {
+      where.OR = [
+        { name: { contains: search, mode: 'insensitive' } },
+        { description: { contains: search, mode: 'insensitive' } },
+        { city: { contains: search, mode: 'insensitive' } },
+      ];
     }
 
     if (city) {

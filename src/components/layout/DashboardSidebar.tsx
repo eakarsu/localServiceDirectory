@@ -27,6 +27,7 @@ const menuItems = [
   { href: '/dashboard/leads', icon: Users, label: 'Leads' },
   { href: '/dashboard/analytics', icon: BarChart3, label: 'Analytics' },
   { href: '/dashboard/messages', icon: MessageSquare, label: 'Messages' },
+  { href: '/dashboard/feature-pack', icon: BarChart3, label: 'Tasks & AI' },
   { href: '/dashboard/settings', icon: Settings, label: 'Settings' },
 ];
 

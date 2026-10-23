@@ -17,6 +17,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased">
+<script src="/feature-pack/feature-pack.js" defer />
         <SessionProvider>
           <ToastProvider>
             <ConfirmProvider>

@@ -108,8 +108,9 @@ echo "AI workspace: http://127.0.0.1:$BACKEND_PORT/ai-workspace"
 export VITE_NATIVE_AI_WORKSPACE_URL="http://127.0.0.1:$BACKEND_PORT/ai-workspace" NEXT_PUBLIC_NATIVE_AI_WORKSPACE_URL="http://127.0.0.1:$BACKEND_PORT/ai-workspace"
 node "$PROJECT_DIR/runtime/setup.mjs"
 CHILD_PIDS=()
-(cd "$PROJECT_DIR"&&exec node runtime/api.mjs)&CHILD_PIDS+=("$!")
-(cd "$PROJECT_DIR"&&exec npm run dev -- --hostname 127.0.0.1 --port "$FRONTEND_PORT")&CHILD_PIDS+=("$!")
+export RUNTIME_PROXY_PORT="$FRONTEND_PORT" RUNTIME_PROXY_TARGET_PORT="$BACKEND_PORT"
+(cd "$PROJECT_DIR"&&exec npm run dev -- --hostname 127.0.0.1 --port "$BACKEND_PORT")&CHILD_PIDS+=("$!")
+(cd "$PROJECT_DIR"&&exec node _runtime-proxy.mjs)&CHILD_PIDS+=("$!")
 kill_tree(){ local pid="$1" child;for child in $(pgrep -P "$pid" 2>/dev/null||true);do kill_tree "$child";done;kill -TERM "$pid" 2>/dev/null||true; }
 cleanup(){ trap - EXIT INT TERM;for pid in "${CHILD_PIDS[@]}";do kill_tree "$pid";done;for pid in "${CHILD_PIDS[@]}";do wait "$pid" 2>/dev/null||true;done; }
 trap cleanup EXIT INT TERM
